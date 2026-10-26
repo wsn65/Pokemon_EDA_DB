@@ -42,6 +42,9 @@ MUTED = "#64748B"
 # Display font: rounded, chunky headings (Fredoka, loaded from Google Fonts; falls back to Nunito / system fonts)
 DISPLAY_FONT = "'Fredoka', 'Nunito', system-ui, sans-serif"
 PLOTLY_DISPLAY_FONT = "Fredoka, Nunito, sans-serif"
+# Pixel font for the small grey labels (Google Fonts, loaded in the <style> block below)
+PIXEL_FONT = "'Press Start 2P', ui-monospace, monospace"
+PLOTLY_PIXEL_FONT = "Press Start 2P, monospace"
 
 CAT_COLORS = {"Single Type": BLUE, "Dual Type": YELLOW}
 # Poké Ball donut: red top half, white bottom half, dark outline
@@ -61,7 +64,7 @@ LABEL = {"attack": "Attack", "defense": "Defense", "special_attack": "Special At
 # ---------- Style ----------
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Press+Start+2P&display=swap');
 :root {{ color-scheme: light; }}
 .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {{ background-color: {BG} !important; color: {TEXT}; }}
 header[data-testid="stHeader"] {{ background: transparent; }}
@@ -74,7 +77,8 @@ h1, h2, h3, [data-testid="stHeading"], [data-testid="stHeading"] * {{ font-famil
 button[data-baseweb="tab"], button[data-baseweb="tab"] * {{ font-family: {DISPLAY_FONT} !important; font-size: 16px; }}
 p, label, li, [data-testid="stMarkdownContainer"] {{ color: {TEXT}; }}
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * {{ color: {MUTED} !important; }}
-[data-testid="stWidgetLabel"] p {{ color: {MUTED}; font-weight: 500; }}
+[data-testid="stWidgetLabel"] p {{ color: {MUTED}; font-weight: 400 !important; font-family: {PIXEL_FONT} !important; font-size: 10px !important; line-height: 1.6 !important; }}
+[data-testid="stRadio"] label[data-baseweb="radio"] [data-testid="stMarkdownContainer"] p {{ font-family: {PIXEL_FONT} !important; font-size: 10px !important; font-weight: 400 !important; line-height: 1.6 !important; }}
 [data-testid="stMetric"] {{
     background: {CARD}; border: 1px solid {BORDER}; border-top: 3px solid {YELLOW};
     border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgba(15,23,42,.06);
@@ -103,7 +107,7 @@ div[data-baseweb="popover"] li:hover {{ background: #F3F0E9 !important; }}
     background: {CARD}; border: 1px solid {BORDER}; border-top: 3px solid {YELLOW};
     border-radius: 12px; padding: 14px 18px; box-shadow: 0 1px 2px rgba(15,23,42,.06); height: 100%;
 }}
-.kpi-label {{ font-size: 14px; font-weight: 600; color: {MUTED}; }}
+.kpi-label {{ font-family: {PIXEL_FONT}; font-size: 10px; font-weight: 400; line-height: 1.5; color: {MUTED}; }}
 .kpi-value {{ font-size: 34px; font-weight: 700; color: {BLUE}; line-height: 1.2; margin-top: 2px; }}
 .kpi-note {{ font-size: 13px; color: {MUTED}; margin-top: 2px; }}
 .ins-value {{ font-size: 26px; font-weight: 700; color: {BLUE}; line-height: 1.25; margin-top: 2px; }}
@@ -132,11 +136,11 @@ section[data-testid="stSidebar"] .about-text {{ font-size: 14px; }}
     padding: 3px 14px; border-radius: 999px; margin: 0 6px 6px 0; letter-spacing: .02em;
 }}
 .p-chip.egg {{ background: {BLUE_TINT}; color: {DARK_BLUE}; font-weight: 600; }}
-.p-tiles {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 8px 0 10px; }}
+.p-tiles {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 8px 0 10px; }}
 .p-tile {{ background: {CARD}; border: 1px solid {BORDER}; border-top: 3px solid {YELLOW}; border-radius: 10px; padding: 8px 12px; }}
-.p-tile .l {{ font-size: 12px; font-weight: 600; color: {MUTED}; }}
+.p-tile .l {{ font-family: {PIXEL_FONT}; font-size: 9px; font-weight: 400; line-height: 1.6; color: {MUTED}; }}
 .p-tile .v {{ font-size: 20px; font-weight: 700; color: {BLUE}; line-height: 1.3; }}
-.p-label {{ font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: {MUTED}; margin: 6px 0 4px; }}
+.p-label {{ font-family: {PIXEL_FONT}; font-size: 9px; font-weight: 400; letter-spacing: .04em; text-transform: uppercase; color: {MUTED}; margin: 10px 0 6px; }}
 .summary {{
     background: {BLUE_TINT}; border-left: 4px solid {YELLOW}; border-radius: 8px;
     padding: 10px 14px; font-size: 14px; color: #1E3A6E; margin: 4px 0 10px;
@@ -152,8 +156,9 @@ def themed(fig, height=None):
         font=dict(family="sans-serif", color=TEXT),
         title_font_family=PLOTLY_DISPLAY_FONT,
         legend=dict(title_text="", font=dict(color=TEXT)),
-        margin=dict(l=10, r=10, t=40, b=10),
     )
+    if fig.layout.margin.l is None:  # a figure can set its own margins; otherwise use the default
+        fig.update_layout(margin=dict(l=10, r=10, t=40, b=10))
     fig.update_xaxes(gridcolor=BORDER, zerolinecolor=BORDER, linecolor=BORDER)
     fig.update_yaxes(gridcolor=BORDER, zerolinecolor=BORDER, linecolor=BORDER)
     # Softer bars: rounded corners and a little more space between bars
@@ -396,7 +401,7 @@ st.markdown(
     f'<div style="text-align:center;margin:0 0 4px">{_logo_html}'
     f'<div style="font-family:{DISPLAY_FONT};font-size:40px;font-weight:700;letter-spacing:.35em;text-indent:.35em;'
     f'text-transform:uppercase;color:{BLUE};line-height:1.1;margin-top:4px">Dashboard</div>'
-    f'<div style="font-size:15px;color:{MUTED};margin-top:8px">Explore the Pokémon world through data</div>'
+    f'<div style="font-family:{PIXEL_FONT};font-size:10px;line-height:1.6;color:{MUTED};margin-top:12px">Explore the Pokémon world through data</div>'
     f'</div>',
     unsafe_allow_html=True,
 )
@@ -457,32 +462,38 @@ with tabs[0]:
         chosen = pick_col.selectbox("Pokémon profile — search a Pokémon by name", names, index=default,
                                     format_func=lambda n: n.title(), key="profile_pick")
         p = df[df["pokemon"] == chosen].iloc[0]
-        img_col, info_col = st.columns([1, 2.2], gap="large")
+        img_col, info_col = st.columns([1.2, 2], gap="large", vertical_alignment="center")
         with img_col:
             img = pokemon_image(p)
             if img:
-                st.image(img, width=260)
+                st.image(img, width=400)
             else:
-                st.markdown(f'<div style="background:{BLUE_TINT};border-radius:16px;height:240px;display:flex;'
+                st.markdown(f'<div style="background:{BLUE_TINT};border-radius:16px;height:400px;display:flex;'
                             f'align-items:center;justify-content:center;color:{MUTED};text-align:center">'
                             'No image found.<br>Add it to the images/ folder as 025.png</div>', unsafe_allow_html=True)
         with info_col:
             chips = type_chip(p["type_1"]) + (type_chip(p["type_2"]) if isinstance(p["type_2"], str) else "")
             eggs = f'<span class="p-chip egg">{p["egg_group_1"]}</span>' + (
                 f'<span class="p-chip egg">{p["egg_group_2"]}</span>' if isinstance(p["egg_group_2"], str) else "")
-            st.markdown(
-                f'<div class="p-name">{p["pokemon"]}</div>'
-                f'<div class="p-id">#{int(p["id"])} · Generation {int(p["generation_id"])} · {p["type_cat"]}</div>'
-                f'<div class="p-label">Type</div>{chips}'
-                f'<div class="p-label">Egg group</div>{eggs}'
-                f'<div class="p-tiles">'
-                f'<div class="p-tile"><div class="l">Height</div><div class="v">{p["height"]} m</div></div>'
-                f'<div class="p-tile"><div class="l">Weight</div><div class="v">{p["weight"]} kg</div></div>'
-                f'<div class="p-tile"><div class="l">Base experience</div><div class="v">{int(p["base_experience"])}</div></div>'
-                f'<div class="p-tile"><div class="l">Average stat</div><div class="v">{p["avg_stat"]:.1f}</div></div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+            head_l, head_r = st.columns([1.1, 1.3], gap="medium")
+            with head_l:
+                st.markdown(
+                    f'<div class="p-name">{p["pokemon"]}</div>'
+                    f'<div class="p-id">#{int(p["id"])} · Generation {int(p["generation_id"])} · {p["type_cat"]}</div>'
+                    f'<div class="p-label">Type</div>{chips}'
+                    f'<div class="p-label">Egg group</div>{eggs}',
+                    unsafe_allow_html=True,
+                )
+            with head_r:
+                st.markdown(
+                    f'<div class="p-tiles">'
+                    f'<div class="p-tile"><div class="l">Height</div><div class="v">{p["height"]} m</div></div>'
+                    f'<div class="p-tile"><div class="l">Weight</div><div class="v">{p["weight"]} kg</div></div>'
+                    f'<div class="p-tile"><div class="l">Base experience</div><div class="v">{int(p["base_experience"])}</div></div>'
+                    f'<div class="p-tile"><div class="l">Average stat</div><div class="v">{p["avg_stat"]:.1f}</div></div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
             sdf = pd.DataFrame({"Stat": [LABEL[s] for s in STATS], "Value": [int(p[s]) for s in STATS],
                                 "Dataset average": [df[s].mean() for s in STATS]})
             fig = go.Figure()
@@ -493,10 +504,15 @@ with tabs[0]:
             fig.add_trace(go.Scatter(x=sdf["Dataset average"], y=sdf["Stat"], mode="markers", name="Dataset average",
                                      marker=dict(symbol="line-ns", size=18, line=dict(color="#1F2937", width=3)),
                                      hovertemplate="Average: %{x:.0f}<extra></extra>"))
-            fig.update_yaxes(autorange="reversed", title="")
-            fig.update_xaxes(title="Base stat", range=[0, 280])
-            fig.update_layout(legend=dict(orientation="h", y=1.15, x=0))
-            show(fig, 290)
+            # Stat names sit above each bar (not on the left), so the bars start at the same left edge as the name
+            fig.update_yaxes(autorange="reversed", title="", showticklabels=False)
+            fig.update_xaxes(title="Base stat", range=[0, 270])
+            for stat_label in sdf["Stat"]:
+                fig.add_annotation(x=0, y=stat_label, xref="x", yref="y", text=stat_label, showarrow=False,
+                                   xanchor="left", yanchor="bottom", yshift=11,
+                                   font=dict(size=9, color=MUTED, family=PLOTLY_PIXEL_FONT))
+            fig.update_layout(legend=dict(orientation="h", y=1.12, x=0), margin=dict(l=0, r=0, t=40, b=10), bargap=0.5)
+            show(fig, 340)
 
     st.write("")
     if not empty:
@@ -834,10 +850,14 @@ with tabs[3]:
 # =============== Physical Characteristics ===============
 with tabs[4]:
     if not empty:
-        # ---- Weight vs height: chart + insight card, same layout as the other pages ----
-        st.subheader("Weight vs height")
-        chart, card = st.columns([3.2, 1], vertical_alignment="center")
-        with chart:
+        # ---- Scatter and bar chart side by side, insight cards on the right ----
+        st.subheader("Weight vs height and average by type category")
+        measure = st.radio("Bar chart: show average", ["Height", "Weight"], horizontal=True, key="phys_view")
+        is_h = measure == "Height"
+        col_name, unit, adj = ("height", "m", "taller") if is_h else ("weight", "kg", "heavier")
+        m = f.groupby("type_cat")[col_name].mean().round(2 if is_h else 1)
+        c1, c2, cards = st.columns([1.5, 1.5, 1.1], vertical_alignment="center")
+        with c1:
             fig = px.scatter(f, x="weight", y="height", color="type_cat", hover_name="pokemon",
                              color_discrete_map=CAT_COLORS,
                              labels={"type_cat": "Type category", "weight": "Weight (kg)", "height": "Height (m)"})
@@ -847,7 +867,14 @@ with tabs[4]:
                 xs = np.array([f["weight"].min(), f["weight"].max()])
                 fig.add_trace(go.Scatter(x=xs, y=slope * xs + intercept, mode="lines", showlegend=False,
                                          line=dict(color=TEXT, width=2, dash="dash"), hoverinfo="skip"))
-            show(fig, 440)
+            fig.update_layout(title="Weight vs height", legend=dict(orientation="h", y=-0.2, x=0))
+            show(fig, 420)
+        with c2:
+            fig = bar_counts(m, "type_cat", col_name)
+            fig.update_layout(title=f"Average {col_name} ({unit})")
+            if not is_h:
+                fig.update_traces(marker_color=YELLOW)
+            show(fig, 420)
         if len(f) >= 3:
             r = f["weight"].corr(f["height"])
             strength = "strong" if abs(r) >= 0.7 else "moderate" if abs(r) >= 0.4 else "weak"
@@ -855,26 +882,12 @@ with tabs[4]:
             take = f"There is a {strength} {direction} relationship between height and weight."
             if r >= 0.4:
                 take += " Taller Pokémon tend to be heavier, but some outliers show that the relationship is not perfect."
-            insight(card, "Height–weight correlation", f"r = {r:.2f}",
+            insight(cards, "Height–weight correlation", f"r = {r:.2f}",
                     "Dashed line shows the overall trend", take)
-
-        # ---- Average height or weight by type category: ONE chart, the user picks ----
-        st.subheader("Average by type category")
-        measure = st.radio("Show average", ["Height", "Weight"], horizontal=True, key="phys_view")
-        is_h = measure == "Height"
-        col_name, unit, adj = ("height", "m", "taller") if is_h else ("weight", "kg", "heavier")
-        m = f.groupby("type_cat")[col_name].mean().round(2 if is_h else 1)
-        chart, card = st.columns([3.2, 1], vertical_alignment="center")
-        with chart:
-            fig = bar_counts(m, "type_cat", col_name)
-            fig.update_layout(title=f"Average {col_name} ({unit})")
-            if not is_h:
-                fig.update_traces(marker_color=YELLOW)
-            show(fig, 400)
         ranked = m.sort_values(ascending=False)
         top = ranked.index[0]
         other = ranked.index[1] if len(ranked) > 1 else None
-        insight(card, f"{adj.title()} type category", f"{top} · {ranked.iloc[0]} {unit}",
+        insight(cards, f"{adj.title()} type category", f"{top} · {ranked.iloc[0]} {unit}",
                 f"{other}: {ranked.iloc[1]} {unit}" if other else "Only one type category in this selection",
                 f"{top} Pokémon are {adj} than {other} Pokémon on average." if other
                 else "Widen the filters to compare single and dual type.")
@@ -925,6 +938,14 @@ with tabs[5]:
         fig.update_xaxes(title="Training set size")
         fig.update_yaxes(title="R2 score")
         show(fig, 420)
+    tr_end, va_end = float(lc["Training score"].iloc[-1]), float(lc["Validation score"].iloc[-1])
+    gap = tr_end - va_end
+    insight(st.container(), "Training vs validation gap", f"{gap:.2f}",
+            f"Training R2 {tr_end:.2f} · validation R2 {va_end:.2f} (largest training size)",
+            "The two curves are close, so the model is not overfitting: it performs about as well on data it did not "
+            "train on." if gap < 0.05 else
+            "The training score is clearly higher than the validation score, which is a sign of overfitting.")
+
     summary(f"The model explains about {M['r2'] * 100:.0f}% of the differences in base experience on Pokémon it did not train on, "
             f"and its predictions are off by about {M['rmse']:.0f} experience points on average (RMSE). "
             "In the actual vs predicted plot, points close to the dashed line are well predicted.")
