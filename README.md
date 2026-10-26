@@ -1,5 +1,4 @@
-# Pokemon_EDA_DB
-Pokémon Data Exploration & Interactive Dashboard
+# Pokémon Data Exploration & Interactive Dashboard
 
 Project Overview
 
