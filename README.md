@@ -14,7 +14,7 @@ Records: 949 Pokemon
 
 Features: Pokemon types, physical characteristics, battle statistics, base experience, and egg groups.
 
-Dashboard Features
+Dashboard Features:
 
 The interactive dashboard includes:
 
