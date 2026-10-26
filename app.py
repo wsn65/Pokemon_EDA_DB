@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 
 import numpy as np
@@ -45,6 +46,7 @@ PLOTLY_DISPLAY_FONT = "Fredoka, Nunito, sans-serif"
 # Pixel font for the small grey labels (Google Fonts, loaded in the <style> block below)
 PIXEL_FONT = "'Press Start 2P', ui-monospace, monospace"
 PLOTLY_PIXEL_FONT = "Press Start 2P, monospace"
+SHOW_INSIGHT_FACTS = False  # True adds the computed one-line fact above the notebook text in every "Details"
 
 CAT_COLORS = {"Single Type": BLUE, "Dual Type": YELLOW}
 # Poké Ball donut: red top half, white bottom half, dark outline
@@ -141,6 +143,20 @@ section[data-testid="stSidebar"] .about-text {{ font-size: 14px; }}
 .p-tile .l {{ font-family: {PIXEL_FONT}; font-size: 9px; font-weight: 400; line-height: 1.6; color: {MUTED}; }}
 .p-tile .v {{ font-size: 20px; font-weight: 700; color: {BLUE}; line-height: 1.3; }}
 .p-label {{ font-family: {PIXEL_FONT}; font-size: 9px; font-weight: 400; letter-spacing: .04em; text-transform: uppercase; color: {MUTED}; margin: 10px 0 6px; }}
+.pokeball {{
+    width: 34px; height: 34px; border-radius: 50%; border: 3px solid #1F2937; box-sizing: border-box; position: relative;
+    background: linear-gradient(#EE1515 46%, #1F2937 46% 54%, #FFFEFC 54%); margin: 0 auto 8px;
+}}
+.pokeball::after {{
+    content: ""; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; transform: translate(-50%, -50%);
+    border-radius: 50%; background: #FFFEFC; border: 3px solid #1F2937; box-sizing: border-box;
+}}
+.pokeball.throw-a {{ animation: ball-a 1.3s ease-in-out; }}
+.pokeball.throw-b {{ animation: ball-b 1.3s ease-in-out; }}
+@keyframes ball-a {{ 0% {{ transform: translateY(-26px) rotate(0deg); }} 30% {{ transform: translateY(0) rotate(0deg); }}
+    45% {{ transform: rotate(-28deg); }} 60% {{ transform: rotate(28deg); }} 75% {{ transform: rotate(-16deg); }} 100% {{ transform: rotate(0deg); }} }}
+@keyframes ball-b {{ 0% {{ transform: translateY(-26px) rotate(0deg); }} 30% {{ transform: translateY(0) rotate(0deg); }}
+    45% {{ transform: rotate(-28deg); }} 60% {{ transform: rotate(28deg); }} 75% {{ transform: rotate(-16deg); }} 100% {{ transform: rotate(0deg); }} }}
 .summary {{
     background: {BLUE_TINT}; border-left: 4px solid {YELLOW}; border-radius: 8px;
     padding: 10px 14px; font-size: 14px; color: #1E3A6E; margin: 4px 0 10px;
@@ -211,8 +227,10 @@ def insight(col, label, value, fact, take):
         box = col.container()
     with box:
         with st.expander("Details"):
-            st.markdown(f'<div class="ins-fact" style="margin-top:0">{fact}</div><div class="ins-take">{take}</div>',
-                        unsafe_allow_html=True)
+            show_fact = bool(fact) and SHOW_INSIGHT_FACTS
+            fact_html = f'<div class="ins-fact" style="margin-top:0">{fact}</div>' if show_fact else ""
+            take_style = "" if show_fact else ' style="margin-top:0;padding-top:0;border-top:none"'
+            st.markdown(f'{fact_html}<div class="ins-take"{take_style}>{take}</div>', unsafe_allow_html=True)
 
 
 @st.cache_data(show_spinner=False)
@@ -453,14 +471,40 @@ tabs = st.tabs(["Overview", "Pokémon Types", "Battle Statistics", "Base Experie
 
 
 # =============== Overview ===============
+def throw_pokeball():
+    """Throw a Poké Ball: a random Pokémon from the whole dataset becomes the selected profile."""
+    ss = st.session_state
+    row = df.sample(1).iloc[0]
+    ss["profile_pick"] = row["pokemon"]
+    ss["ball_throws"] = ss.get("ball_throws", 0) + 1
+    msg = f"Gotcha! {row['pokemon'].title()} was caught!"
+    if row["avg_stat"] >= df["avg_stat"].quantile(0.95):
+        msg += " Wow, it is in the top 5% of average stats!"
+    ss["ball_msg"] = msg
+
+
+def clear_ball_msg():
+    st.session_state.pop("ball_msg", None)
+
+
 with tabs[0]:
     # ---- Pokémon profile: pick any Pokémon (independent of the sidebar filters) ----
     with st.container(border=True):
         names = sorted(df["pokemon"])
         default = names.index("pikachu") if "pikachu" in names else 0
-        pick_col, _ = st.columns([1, 2])
+        pick_col, throw_col, ball_col, _ = st.columns([1.5, 0.9, 0.3, 0.8], vertical_alignment="bottom")
         chosen = pick_col.selectbox("Pokémon profile — search a Pokémon by name", names, index=default,
-                                    format_func=lambda n: n.title(), key="profile_pick")
+                                    format_func=lambda n: n.title(), key="profile_pick", on_change=clear_ball_msg)
+        throws = st.session_state.get("ball_throws", 0)
+        try:
+            throw_col.button("Throw a Pokéball", on_click=throw_pokeball, key="throw_ball", width="stretch")
+        except TypeError:
+            throw_col.button("Throw a Pokéball", on_click=throw_pokeball, key="throw_ball", use_container_width=True)
+        ball_col.markdown(f'<div class="pokeball{" throw-" + ("a" if throws % 2 else "b") if throws else ""}"></div>',
+                          unsafe_allow_html=True)
+        if st.session_state.get("ball_msg"):
+            st.markdown(f'<div style="font-family:{PIXEL_FONT};font-size:10px;line-height:1.6;color:{BLUE};margin:2px 0 8px">'
+                        f'{st.session_state["ball_msg"]}</div>', unsafe_allow_html=True)
         p = df[df["pokemon"] == chosen].iloc[0]
         img_col, info_col = st.columns([1.2, 2], gap="large", vertical_alignment="center")
         with img_col:
@@ -684,8 +728,8 @@ with tabs[2]:
         DIST = {  # stat: (bins, takeaway from the notebook)
             "attack": (20, "Most Pokémon have moderate attack values between 45 and 100. The distribution is slightly skewed "
                            "to the right, which means a small number of Pokémon have high attack values."),
-            "defense": (20, "Most Pokémon have defense values between 40 and 100. The distribution is right skewed, which means "
-                            "a small number of Pokémon have high defense values."),
+            "defense": (20, "Most Pokémon have defense values between 40 and 100. The distribution of defense values is right skewed, "
+                            "which indicates that a small number of Pokémon have high defense values."),
             "speed": (20, "There are two peaks in the Speed histogram, around 50–60 and 90–100. This means there are two common "
                           "speed ranges, with a small number of Pokémon having high speed values."),
             "hp": (25, "Most Pokémon have HP values between 50 and 80. The distribution is skewed to the right, which means a "
@@ -703,7 +747,7 @@ with tabs[2]:
             show(fig, 400)
         q1, med, q3 = f[stat].quantile([0.25, 0.5, 0.75])
         insight(card, f"Typical {LABEL[stat]}", f"Median {med:.0f}",
-                f"Half of Pokémon have {LABEL[stat]} between {q1:.0f} and {q3:.0f}", note)
+                "", note)
 
         st.subheader("Boxplot of the stats")
         BOX_TAKE = {
@@ -736,13 +780,13 @@ with tabs[2]:
         if len(box_stats) > 1:
             widest = max(spread, key=spread.get)
             insight(card, "Most variable stat", LABEL[widest],
-                    " · ".join(f"{LABEL[k]} {spread[k]:.0f}" for k in box_stats) + " (spread of the middle half)",
+                    "",
                     BOX_TAKE["all"] + OUTLIER_NOTE)
         else:
             k = box_stats[0]
             q1, q3 = f[k].quantile([0.25, 0.75])
             insight(card, f"{LABEL[k]} spread", f"{spread[k]:.0f} points",
-                    f"Half of Pokémon fall between {q1:.0f} and {q3:.0f} · {outs[k]} outliers",
+                    "",
                     BOX_TAKE[k] + OUTLIER_NOTE)
 
         st.subheader("Correlation matrix of the stats")
@@ -792,7 +836,7 @@ with tabs[2]:
                 scatter_names = " and ".join(f"{LABEL[x]} vs {LABEL[y]}" for x, y, _ in top_pairs)
                 notes.append(f"The scatter plots ({scatter_names}) support the heatmap. A few outliers appear away from the main cluster.")
                 insight(st.container(), "Strongest relationship", f"r = {sr:.2f}",
-                        f"{LABEL[sa]} & {LABEL[sb]} · weakest: {LABEL[wa]} & {LABEL[wb]} ({wr:.2f})",
+                        "",
                         "<br>".join(f"• {n}" for n in notes))
 
 
@@ -938,14 +982,6 @@ with tabs[5]:
         fig.update_xaxes(title="Training set size")
         fig.update_yaxes(title="R2 score")
         show(fig, 420)
-    tr_end, va_end = float(lc["Training score"].iloc[-1]), float(lc["Validation score"].iloc[-1])
-    gap = tr_end - va_end
-    insight(st.container(), "Training vs validation gap", f"{gap:.2f}",
-            f"Training R2 {tr_end:.2f} · validation R2 {va_end:.2f} (largest training size)",
-            "The two curves are close, so the model is not overfitting: it performs about as well on data it did not "
-            "train on." if gap < 0.05 else
-            "The training score is clearly higher than the validation score, which is a sign of overfitting.")
-
     summary(f"The model explains about {M['r2'] * 100:.0f}% of the differences in base experience on Pokémon it did not train on, "
             f"and its predictions are off by about {M['rmse']:.0f} experience points on average (RMSE). "
             "In the actual vs predicted plot, points close to the dashed line are well predicted.")
