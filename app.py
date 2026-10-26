@@ -122,6 +122,9 @@ div[data-baseweb="popover"] li:hover {{ background: #F3F0E9 !important; }}
 .about-text {{ font-size: 16px; color: {TEXT}; line-height: 1.5; }}
 .about-text a {{ color: {BLUE}; font-weight: 600; text-decoration: none; }}
 .about-text a:hover {{ text-decoration: underline; }}
+section[data-testid="stSidebar"] .about {{ margin: 0 auto; }}
+section[data-testid="stSidebar"] .about-row {{ padding: 8px 0; }}
+section[data-testid="stSidebar"] .about-text {{ font-size: 14px; }}
 .p-name {{ font-size: 34px; font-weight: 700; color: {BLUE}; text-transform: capitalize; line-height: 1.1; }}
 .p-id {{ font-size: 15px; color: {MUTED}; font-weight: 600; margin: 2px 0 10px; }}
 .p-chip {{
@@ -399,12 +402,31 @@ st.markdown(
 )
 st.divider()
 
-# ---------- Sidebar filters ----------
+# ---------- Sidebar: dataset overview + filters ----------
+st.sidebar.header("Dataset overview")
+st.sidebar.markdown(
+    """
+<div class="about">
+  <div class="about-row"><div class="about-label">Dataset</div><div class="about-text">Pokemon</div></div>
+  <div class="about-row"><div class="about-label">Source</div><div class="about-text">
+<a href="https://github.com/rfordatascience/tidytuesday/blob/main/data/2025/2025-04-01/readme.md" target="_blank">TidyTuesday Pokemon dataset</a></div></div>
+  <div class="about-row"><div class="about-label">Description</div><div class="about-text">
+This dataset contains information about Pokémon including their physical characteristics, types and battle statistics.</div></div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
 st.sidebar.header("Filters")
 gens = sorted(df["generation_id"].unique())
 sel_gen = st.sidebar.multiselect("Generation", gens, default=gens)
 sel_cat = st.sidebar.multiselect("Type category", list(CAT_COLORS), default=list(CAT_COLORS))
-f = df[df["generation_id"].isin(sel_gen) & df["type_cat"].isin(sel_cat)]
+all_types = sorted(df["type_1"].unique())
+sel_type = st.sidebar.multiselect("Primary type", all_types, default=all_types, format_func=str.title)
+all_eggs = sorted(df["egg_group_1"].unique())
+sel_egg = st.sidebar.multiselect("Egg group", all_eggs, default=all_eggs, format_func=str.title)
+f = df[df["generation_id"].isin(sel_gen) & df["type_cat"].isin(sel_cat)
+       & df["type_1"].isin(sel_type) & df["egg_group_1"].isin(sel_egg)]
 st.sidebar.caption(f"{len(f):,} of {len(df):,} Pokémon selected")
 st.sidebar.caption("The ML Model tab always uses the full dataset, as in the notebook.")
 
@@ -427,19 +449,6 @@ tabs = st.tabs(["Overview", "Pokémon Types", "Battle Statistics", "Base Experie
 
 # =============== Overview ===============
 with tabs[0]:
-    with st.expander("Dataset overview", expanded=True):
-        st.markdown(
-            """
-<div class="about">
-  <div class="about-row"><div class="about-label">Dataset</div><div class="about-text">Pokemon</div></div>
-  <div class="about-row"><div class="about-label">Source</div><div class="about-text">
-    <a href="https://github.com/rfordatascience/tidytuesday/blob/main/data/2025/2025-04-01/readme.md" target="_blank">TidyTuesday Pokemon dataset</a></div></div>
-  <div class="about-row"><div class="about-label">Description</div><div class="about-text">
-    This dataset contains information about Pokémon including their physical characteristics, types and battle statistics.</div></div>
-</div>
-""",
-            unsafe_allow_html=True,
-        )
     # ---- Pokémon profile: pick any Pokémon (independent of the sidebar filters) ----
     with st.container(border=True):
         names = sorted(df["pokemon"])
@@ -729,8 +738,7 @@ with tabs[2]:
             ("attack", "defense"): "Attack and Defense show a moderate positive linear relationship (r = {r}).",
             ("speed", "defense"): "Speed and Defense show almost no linear relationship (r = {r}).",
         }
-        sel_stats = st.multiselect("Stats to compare", STATS, default=STATS, format_func=lambda k: LABEL[k], key="bs_corr")
-        sel_stats = sorted(sel_stats, key=STATS.index)
+        sel_stats = list(STATS)  # always compare all six stats
         if len(sel_stats) < 2:
             st.info("Pick at least two stats to see how they relate.")
         else:
@@ -743,21 +751,31 @@ with tabs[2]:
                 top_pairs = ranked[:2]  # the scatter plots show the two clearest relationships
                 sa, sb, sr = ranked[0]
                 wa, wb, wr = ranked[-1]
-                chart, scat, card = st.columns([1.7, 1.3, 1], vertical_alignment="center")
+
+                # 1) Heatmap on the left, its scatter plots stacked on the right (same height as the heatmap)
+                chart, scat = st.columns([1.3, 1], gap="large", vertical_alignment="center")
                 with chart:
-                    show(heatmap(cm.rename(index=LABEL, columns=LABEL)), 500)
+                    st.markdown("##### Correlation heatmap")
+                    show(heatmap(cm.rename(index=LABEL, columns=LABEL)), 520)
                 with scat:
-                    h = 245 if len(top_pairs) == 2 else 500
+                    st.markdown("##### Strongest relationships")
+                    h = 240 if len(top_pairs) == 2 else 480
                     for (x, y, r), color in zip(top_pairs, (BLUE, RED)):
                         fig = px.scatter(f, x=x, y=y, hover_name="pokemon", labels={x: LABEL[x], y: LABEL[y]})
-                        fig.update_traces(marker=dict(color=color, size=6, opacity=0.75))
+                        fig.update_traces(marker=dict(color=color, size=6, opacity=0.7))
+                        slope, intercept = np.polyfit(f[x], f[y], 1)
+                        xs = np.array([f[x].min(), f[x].max()])
+                        fig.add_trace(go.Scatter(x=xs, y=slope * xs + intercept, mode="lines", showlegend=False,
+                                                 line=dict(color=TEXT, width=2, dash="dash"), hoverinfo="skip"))
                         fig.update_layout(title=f"{LABEL[x]} vs {LABEL[y]} (r = {r:.2f})")
                         show(fig, h)
+
+                # 3) Insight card underneath
                 notes = [t.format(r=f"{cm.loc[x, y]:.2f}") for (x, y), t in CORR_NOTES.items()
                          if x in sel_stats and y in sel_stats]
                 scatter_names = " and ".join(f"{LABEL[x]} vs {LABEL[y]}" for x, y, _ in top_pairs)
                 notes.append(f"The scatter plots ({scatter_names}) support the heatmap. A few outliers appear away from the main cluster.")
-                insight(card, "Strongest relationship", f"r = {sr:.2f}",
+                insight(st.container(), "Strongest relationship", f"r = {sr:.2f}",
                         f"{LABEL[sa]} & {LABEL[sb]} · weakest: {LABEL[wa]} & {LABEL[wb]} ({wr:.2f})",
                         "<br>".join(f"• {n}" for n in notes))
 
@@ -765,66 +783,101 @@ with tabs[2]:
 # =============== Base Experience ===============
 with tabs[3]:
     if not empty:
+        # ---- Distribution: chart + insight card, same layout as the Battle Statistics distributions ----
         st.subheader("Base experience distribution")
-        fig = go.Figure(hist_kde(f["base_experience"], 30))
-        fig.update_xaxes(title="base_experience")
-        fig.update_yaxes(title="Count")
-        show(fig, 380)
-        summary("Most Pokemons base experience range between 35 and 60 and between 150 and 190. The distribution is right skewed "
-                "with a few high outliers.")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("Base experience vs average stat")
-            fig = px.scatter(f, x="avg_stat", y="base_experience", hover_name="pokemon")
-            fig.update_traces(marker=dict(color=BLUE, size=7, opacity=0.75))
+        chart, card = st.columns([3.2, 1], vertical_alignment="center")
+        with chart:
+            fig = go.Figure(hist_kde(f["base_experience"], 30))
+            fig.update_xaxes(title="Base experience")
+            fig.update_yaxes(title="Count")
             show(fig, 400)
-        with c2:
-            st.subheader("Correlation")
-            show(heatmap(f[["avg_stat", "base_experience"]].corr()), 400)
-        summary("There is a strong positive correlation between Base Experience and Stats average with a three distinct diagonal "
-                "patterns visible in the scatter plot.")
+        q1, med, q3 = f["base_experience"].quantile([0.25, 0.5, 0.75])
+        insight(card, "Typical base experience", f"Median {med:.0f}",
+                f"Half of Pokémon have base experience between {q1:.0f} and {q3:.0f}",
+                "Most Pokémon have a base experience between 35 and 60 or between 150 and 190. "
+                "The distribution is right skewed, with a few high outliers.")
 
-        st.subheader("Experience ratio (base experience ÷ average stat)")
-        fig = go.Figure(go.Histogram(x=f["exp_ratio"], nbinsx=50, marker_color=BLUE))
-        fig.update_xaxes(title="exp_ratio")
-        fig.update_yaxes(title="Count")
-        show(fig, 360)
-
-        st.subheader("Scatter grouped by experience ratio")
-        fig = px.scatter(f, x="avg_stat", y="base_experience", color="exp_group", hover_name="pokemon",
-                         color_discrete_map=EXP_COLORS, category_orders=EXP_ORDER,
-                         labels={"exp_group": "exp_group"})
-        fig.update_traces(marker=dict(size=7, opacity=0.8))
-        show(fig, 420)
+        # ---- Relationship with the average stat: heatmap + scatter side by side, insight card underneath ----
+        st.subheader("Base experience vs average stat")
+        if len(f) < 3:
+            st.info("Not enough Pokémon in the current selection to compute the correlation.")
+        else:
+            cm = f[["avg_stat", "base_experience"]].corr()
+            r = cm.loc["avg_stat", "base_experience"]
+            chart, scat = st.columns([1, 1.3], gap="large", vertical_alignment="center")
+            with chart:
+                st.markdown("##### Correlation heatmap")
+                names = {"avg_stat": "Average stat", "base_experience": "Base experience"}
+                fig = heatmap(cm.rename(index=names, columns=names))
+                fig.update_xaxes(constrain="domain")
+                fig.update_yaxes(scaleanchor="x", scaleratio=1, constrain="domain")  # square cells
+                show(fig, 420)
+            with scat:
+                st.markdown("##### Scatter plot")
+                fig = px.scatter(f, x="avg_stat", y="base_experience", hover_name="pokemon",
+                                 labels={"avg_stat": "Average stat", "base_experience": "Base experience"})
+                fig.update_traces(marker=dict(color=BLUE, size=7, opacity=0.7))
+                slope, intercept = np.polyfit(f["avg_stat"], f["base_experience"], 1)
+                xs = np.array([f["avg_stat"].min(), f["avg_stat"].max()])
+                fig.add_trace(go.Scatter(x=xs, y=slope * xs + intercept, mode="lines", showlegend=False,
+                                         line=dict(color=TEXT, width=2, dash="dash"), hoverinfo="skip"))
+                fig.update_layout(title=f"Base experience vs average stat (r = {r:.2f})")
+                show(fig, 420)
+            strength = "strong" if abs(r) >= 0.7 else "moderate" if abs(r) >= 0.4 else "weak"
+            direction = "positive" if r >= 0 else "negative"
+            insight(st.container(), "Correlation", f"r = {r:.2f}",
+                    "Base experience & average stat",
+                    f"There is a {strength} {direction} correlation between base experience and the average stat. "
+                    "Three distinct diagonal patterns are visible in the scatter plot.")
 
 
 # =============== Physical Characteristics ===============
 with tabs[4]:
     if not empty:
+        # ---- Weight vs height: chart + insight card, same layout as the other pages ----
         st.subheader("Weight vs height")
-        fig = px.scatter(f, x="weight", y="height", color="type_cat", hover_name="pokemon",
-                         color_discrete_map=CAT_COLORS, labels={"type_cat": "type_cat"})
-        fig.update_traces(marker=dict(size=7, opacity=0.8))
-        show(fig, 440)
-        st.caption(f"Correlation between weight and height: **{f['weight'].corr(f['height']):.3f}**")
-        summary("There is a moderately strong relationship between Pokemon height and weight. Taller Pokemon tend to be heavier. "
-                "However, some outliers in the data shows that this relationship is not perfect.")
+        chart, card = st.columns([3.2, 1], vertical_alignment="center")
+        with chart:
+            fig = px.scatter(f, x="weight", y="height", color="type_cat", hover_name="pokemon",
+                             color_discrete_map=CAT_COLORS,
+                             labels={"type_cat": "Type category", "weight": "Weight (kg)", "height": "Height (m)"})
+            fig.update_traces(marker=dict(size=7, opacity=0.8))
+            if len(f) >= 3:
+                slope, intercept = np.polyfit(f["weight"], f["height"], 1)
+                xs = np.array([f["weight"].min(), f["weight"].max()])
+                fig.add_trace(go.Scatter(x=xs, y=slope * xs + intercept, mode="lines", showlegend=False,
+                                         line=dict(color=TEXT, width=2, dash="dash"), hoverinfo="skip"))
+            show(fig, 440)
+        if len(f) >= 3:
+            r = f["weight"].corr(f["height"])
+            strength = "strong" if abs(r) >= 0.7 else "moderate" if abs(r) >= 0.4 else "weak"
+            direction = "positive" if r >= 0 else "negative"
+            take = f"There is a {strength} {direction} relationship between height and weight."
+            if r >= 0.4:
+                take += " Taller Pokémon tend to be heavier, but some outliers show that the relationship is not perfect."
+            insight(card, "Height–weight correlation", f"r = {r:.2f}",
+                    "Dashed line shows the overall trend", take)
 
-        st.subheader("Average height and weight by type category")
-        c1, c2 = st.columns(2)
-        with c1:
-            m = f.groupby("type_cat")["height"].mean().round(2)
-            fig = bar_counts(m, "type_cat", "height")
-            fig.update_layout(title="Average height")
-            show(fig, 360)
-        with c2:
-            m = f.groupby("type_cat")["weight"].mean().round(1)
-            fig = bar_counts(m, "type_cat", "weight")
-            fig.update_layout(title="Average weight")
-            fig.update_traces(marker_color=YELLOW)
-            show(fig, 360)
-        summary("Dual Type pokemons tend to be taller and heavier than Single Type pokemons, with a noticeable difference between the two groups.")
+        # ---- Average height or weight by type category: ONE chart, the user picks ----
+        st.subheader("Average by type category")
+        measure = st.radio("Show average", ["Height", "Weight"], horizontal=True, key="phys_view")
+        is_h = measure == "Height"
+        col_name, unit, adj = ("height", "m", "taller") if is_h else ("weight", "kg", "heavier")
+        m = f.groupby("type_cat")[col_name].mean().round(2 if is_h else 1)
+        chart, card = st.columns([3.2, 1], vertical_alignment="center")
+        with chart:
+            fig = bar_counts(m, "type_cat", col_name)
+            fig.update_layout(title=f"Average {col_name} ({unit})")
+            if not is_h:
+                fig.update_traces(marker_color=YELLOW)
+            show(fig, 400)
+        ranked = m.sort_values(ascending=False)
+        top = ranked.index[0]
+        other = ranked.index[1] if len(ranked) > 1 else None
+        insight(card, f"{adj.title()} type category", f"{top} · {ranked.iloc[0]} {unit}",
+                f"{other}: {ranked.iloc[1]} {unit}" if other else "Only one type category in this selection",
+                f"{top} Pokémon are {adj} than {other} Pokémon on average." if other
+                else "Widen the filters to compare single and dual type.")
 
 
 # =============== ML Model ===============
