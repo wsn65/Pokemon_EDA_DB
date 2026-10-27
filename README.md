@@ -36,7 +36,7 @@ Python
 
 Streamlit
 
-Live App: 
+Live Dashboard: https://pokemonedadb.streamlit.app/ 
 
 
 
